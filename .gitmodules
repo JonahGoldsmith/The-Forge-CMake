@@ -1,7 +1,4 @@
 [submodule "The-Forge"]
 	path = The-Forge
 	url = https://github.com/JonahGoldsmith/The-Forge
-[submodule "ForgeSDL/vendor/SDL"]
-	path = ForgeSDL/vendor/SDL
-	url = https://github.com/libsdl-org/SDL
-	branch = SDL2
+
