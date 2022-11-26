@@ -35,11 +35,12 @@ Fence*        pRenderCompleteFences[gImageCount] = { NULL };
 Semaphore*    pImageAcquiredSemaphore = NULL;
 Semaphore*    pRenderCompleteSemaphores[gImageCount] = { NULL };
 
-Shader*   pTriangleShader = NULL;
+Shader*   pQuadShader = NULL;
 
-Buffer* pTriangleVertexBuffer = NULL;
+Buffer* pQuadVertexBuffer = NULL;
+Buffer* pQuadIndexBuffer = NULL;
 
-Pipeline* pTrianglePipeline = NULL;
+Pipeline* pQuadPipeline = NULL;
 
 RootSignature* pRootSignature = NULL;
 
@@ -51,12 +52,16 @@ struct Vertex
 };
 
 //Basic Vertices for a Triangle
-Vertex vertices[3] = {
-        {{0.0, 0.5, 0.0}, {1.0, 0.0, 0.0, 1.0}},
+Vertex vertices[4] = {
+        {{-0.5, 0.5, 0.0}, {1.0, 0.0, 0.0, 1.0}},
         {{0.5, -0.5, 0.0}, {0.0, 1.0, 0.0, 1.0}},
-        {{-0.5, -0.5, 0.0}, {0.0, 0.0, 1.0, 1.0}}
+        {{-0.5, -0.5, 0.0}, {0.0, 0.0, 1.0, 1.0}},
+        {{0.5, 0.5, 0.0}, {1.0, 1.0, 1.0, 1.0}}
 };
 
+uint16_t indices[] = {
+        0, 1, 2, 0, 3, 1
+};
 
 class Triangle : public IApp
 {
@@ -116,8 +121,16 @@ class Triangle : public IApp
         loadDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
         loadDesc.mDesc.mSize = sizeof(vertices);
         loadDesc.pData = vertices;
-        loadDesc.ppBuffer = &pTriangleVertexBuffer;
+        loadDesc.ppBuffer = &pQuadVertexBuffer;
         addResource(&loadDesc, NULL);
+
+        BufferLoadDesc ibDesc = {};
+        ibDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_INDEX_BUFFER;
+        ibDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
+        ibDesc.mDesc.mSize = sizeof(indices);
+        ibDesc.pData = indices;
+        ibDesc.ppBuffer = &pQuadIndexBuffer;
+        addResource(&ibDesc, NULL);
 
         //This commented out section is for loading the Font System and User Interface!
         /*
@@ -168,7 +181,8 @@ class Triangle : public IApp
     {
         exitInputSystem();
 
-        removeResource(pTriangleVertexBuffer);
+        removeResource(pQuadIndexBuffer);
+        removeResource(pQuadVertexBuffer);
 
         for (uint32_t i = 0; i < gImageCount; ++i)
         {
@@ -196,9 +210,9 @@ class Triangle : public IApp
             basicShader.mStages[0] = { "triangle.vert", NULL, 0 , NULL};
             basicShader.mStages[1] = { "triangle.frag", NULL, 0, NULL };
 
-            addShader(pRenderer, &basicShader, &pTriangleShader);
+            addShader(pRenderer, &basicShader, &pQuadShader);
 
-            RootSignatureDesc rootDesc = { &pTriangleShader, 1 };
+            RootSignatureDesc rootDesc = { &pQuadShader, 1 };
             rootDesc.mStaticSamplerCount = 0;
             addRootSignature(pRenderer, &rootDesc, &pRootSignature);
 
@@ -255,11 +269,11 @@ class Triangle : public IApp
             pipelineSettings.mSampleQuality = pSwapChain->ppRenderTargets[0]->mSampleQuality;
             pipelineSettings.mDepthStencilFormat = TinyImageFormat_UNDEFINED;
             pipelineSettings.pRootSignature = pRootSignature;
-            pipelineSettings.pShaderProgram = pTriangleShader;
+            pipelineSettings.pShaderProgram = pQuadShader;
             pipelineSettings.pRasterizerState = &rasterizerStateDesc;
             pipelineSettings.pBlendState = &blendStateDesc;
             pipelineSettings.pVertexLayout = &vertexLayout;
-            addPipeline(pRenderer, &desc, &pTrianglePipeline);
+            addPipeline(pRenderer, &desc, &pQuadPipeline);
         }
 
         return true;
@@ -273,7 +287,7 @@ class Triangle : public IApp
 
         if (pReloadDesc->mType & (RELOAD_TYPE_SHADER | RELOAD_TYPE_RENDERTARGET))
         {
-            removePipeline(pRenderer, pTrianglePipeline);
+            removePipeline(pRenderer, pQuadPipeline);
         }
 
         if (pReloadDesc->mType & (RELOAD_TYPE_RESIZE | RELOAD_TYPE_RENDERTARGET))
@@ -286,7 +300,7 @@ class Triangle : public IApp
         {
            // removeDescriptorSets();
             removeRootSignature(pRenderer, pRootSignature);
-            removeShader(pRenderer, pTriangleShader);
+            removeShader(pRenderer, pQuadShader);
         }
     }
 
@@ -339,10 +353,11 @@ class Triangle : public IApp
         cmdSetViewport(cmd, 0.0f, 0.0f, (float)pRenderTarget->mWidth, (float)pRenderTarget->mHeight, 0.0f, 1.0f);
         cmdSetScissor(cmd, 0, 0, pRenderTarget->mWidth, pRenderTarget->mHeight);
 
-        cmdBindPipeline(cmd, pTrianglePipeline);
+        cmdBindPipeline(cmd, pQuadPipeline);
         uint32_t vertexStride = sizeof(Vertex);
-        cmdBindVertexBuffer(cmd, 1, &pTriangleVertexBuffer, &vertexStride, NULL);
-        cmdDraw(cmd, 3, 0);
+        cmdBindVertexBuffer(cmd, 1, &pQuadVertexBuffer, &vertexStride, NULL);
+        cmdBindIndexBuffer(cmd, pQuadIndexBuffer, INDEX_TYPE_UINT16, 0);
+        cmdDrawIndexed(cmd, 6, 0, 0);
 
         barriers[0] = { pRenderTarget, RESOURCE_STATE_RENDER_TARGET, RESOURCE_STATE_PRESENT };
         cmdResourceBarrier(cmd, 0, NULL, 0, NULL, 1, barriers);
