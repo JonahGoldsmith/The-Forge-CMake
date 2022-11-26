@@ -128,3 +128,4 @@ message("\n")
 
 add_subdirectory(Common)
 add_subdirectory(Testing)
+add_subdirectory(Triangle)

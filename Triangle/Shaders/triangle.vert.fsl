@@ -1,0 +1,23 @@
+
+
+STRUCT(VSInput)
+{
+	DATA(float3, Position, POSITION);
+	DATA(float4, Color,   COLOR);
+};
+
+STRUCT(VSOutput)
+{
+	DATA(float4, Position, SV_Position);
+	DATA(float4, Color,    COLOR);
+};
+
+VSOutput VS_MAIN( VSInput In )
+{
+    INIT_MAIN;
+    VSOutput Out;
+    Out.Position = float4(In.Position, 1.0);
+    Out.Color = In.Color;
+
+    RETURN(Out);
+}
