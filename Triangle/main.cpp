@@ -193,8 +193,8 @@ class Triangle : public IApp
         if (pReloadDesc->mType & RELOAD_TYPE_SHADER)
         {
             ShaderLoadDesc basicShader = {};
-            basicShader.mStages[0] = { "triangle.vert", NULL, 0 };
-            basicShader.mStages[1] = { "triangle.frag", NULL, 0 };
+            basicShader.mStages[0] = { "triangle.vert", NULL, 0 , NULL};
+            basicShader.mStages[1] = { "triangle.frag", NULL, 0, NULL };
 
             addShader(pRenderer, &basicShader, &pTriangleShader);
 
@@ -231,10 +231,19 @@ class Triangle : public IApp
             rasterizerStateDesc.mCullMode = CULL_MODE_NONE;
 
             DepthStateDesc depthStateDesc = {};
-            depthStateDesc.mDepthTest = true;
-            depthStateDesc.mDepthWrite = true;
-            depthStateDesc.mDepthFunc = CMP_GEQUAL;
+            depthStateDesc.mDepthTest = false;
+            depthStateDesc.mDepthWrite = false;
 
+            BlendStateDesc blendStateDesc = {};
+            blendStateDesc.mSrcAlphaFactors[0] = BC_SRC_ALPHA;
+            blendStateDesc.mDstAlphaFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
+            blendStateDesc.mSrcFactors[0] = BC_SRC_ALPHA;
+            blendStateDesc.mDstFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
+            blendStateDesc.mMasks[0] = ALL;
+            blendStateDesc.mRenderTargetMask = BLEND_STATE_TARGET_0;
+            blendStateDesc.mIndependentBlend = false;
+
+            // VertexLayout for sprite drawing.
             PipelineDesc desc = {};
             desc.mType = PIPELINE_TYPE_GRAPHICS;
             GraphicsPipelineDesc& pipelineSettings = desc.mGraphicsDesc;
@@ -244,12 +253,12 @@ class Triangle : public IApp
             pipelineSettings.pColorFormats = &pSwapChain->ppRenderTargets[0]->mFormat;
             pipelineSettings.mSampleCount = pSwapChain->ppRenderTargets[0]->mSampleCount;
             pipelineSettings.mSampleQuality = pSwapChain->ppRenderTargets[0]->mSampleQuality;
-            //pipelineSettings.mDepthStencilFormat = pDepthBuffer->mFormat;
+            pipelineSettings.mDepthStencilFormat = TinyImageFormat_UNDEFINED;
             pipelineSettings.pRootSignature = pRootSignature;
             pipelineSettings.pShaderProgram = pTriangleShader;
-            pipelineSettings.pVertexLayout = &vertexLayout;
             pipelineSettings.pRasterizerState = &rasterizerStateDesc;
-           // pipelineSettings.mVRFoveatedRendering = true;
+            pipelineSettings.pBlendState = &blendStateDesc;
+            pipelineSettings.pVertexLayout = &vertexLayout;
             addPipeline(pRenderer, &desc, &pTrianglePipeline);
         }
 
@@ -293,6 +302,9 @@ class Triangle : public IApp
             waitQueueIdle(pGraphicsQueue);
             ::toggleVSync(pRenderer, &pSwapChain);
         }
+        
+        uint32_t swapchainImageIndex;
+        acquireNextImage(pRenderer, pSwapChain, pImageAcquiredSemaphore, NULL, &swapchainImageIndex);
 
         // Stall if CPU is running "Swap Chain Buffer Count" frames ahead of GPU
         Fence*      pNextFence = pRenderCompleteFences[gFrameIndex];
@@ -305,7 +317,7 @@ class Triangle : public IApp
 
         resetCmdPool(pRenderer, pCmdPools[gFrameIndex]);
 
-        RenderTarget* pRenderTarget = pSwapChain->ppRenderTargets[gFrameIndex];
+        RenderTarget* pRenderTarget = pSwapChain->ppRenderTargets[swapchainImageIndex];
 
         Semaphore* pRenderCompleteSemaphore = pRenderCompleteSemaphores[gFrameIndex];
         Fence*     pRenderCompleteFence = pRenderCompleteFences[gFrameIndex];
@@ -373,8 +385,8 @@ class Triangle : public IApp
         swapChainDesc.mHeight = mSettings.mHeight;
         swapChainDesc.mImageCount = gImageCount;
         swapChainDesc.mColorFormat = getRecommendedSwapchainFormat(true, true);
+        swapChainDesc.mColorClearValue = { { 0.02f, 0.02f, 0.02f, 1.0f } };
         swapChainDesc.mEnableVsync = mSettings.mVSyncEnabled;
-        swapChainDesc.mFlags = SWAP_CHAIN_CREATION_FLAG_ENABLE_FOVEATED_RENDERING_VR;
         ::addSwapChain(pRenderer, &swapChainDesc, &pSwapChain);
 
         return pSwapChain != NULL;
