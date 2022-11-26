@@ -302,7 +302,7 @@ class Triangle : public IApp
             waitQueueIdle(pGraphicsQueue);
             ::toggleVSync(pRenderer, &pSwapChain);
         }
-
+        
         uint32_t swapchainImageIndex;
         acquireNextImage(pRenderer, pSwapChain, pImageAcquiredSemaphore, NULL, &swapchainImageIndex);
 

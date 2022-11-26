@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.6)
 
-project(Testing)
+project(Quad)
 
 add_executable(${PROJECT_NAME} main.cpp)
 
@@ -87,17 +87,5 @@ endif ()
 add_custom_command(
         TARGET ${PROJECT_NAME} PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/Textures
-        ${CMAKE_CURRENT_BINARY_DIR}/Textures)
-
-add_custom_command(
-        TARGET ${PROJECT_NAME} PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/GPUCfg
         ${CMAKE_CURRENT_BINARY_DIR}/GPUCfg)
-
-add_custom_command(
-        TARGET ${PROJECT_NAME} PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/Fonts
-        ${CMAKE_CURRENT_BINARY_DIR}/Fonts)
