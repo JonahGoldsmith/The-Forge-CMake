@@ -2,13 +2,17 @@ cmake_minimum_required(VERSION 3.6)
 
 project(SDLForge)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp
+        vendor/imgui/imgui_impl_sdl.cpp
+        vendor/imgui/imgui_impl_sdl.h)
 
 add_subdirectory(vendor/SDL-SDL2)
+add_subdirectory(vendor/imgui)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static)
 
-target_include_directories(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static)
+target_link_libraries(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static IMGUI)
+
+target_include_directories(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static IMGUI)
 
 
 if (${WINDOWS} MATCHES ON)

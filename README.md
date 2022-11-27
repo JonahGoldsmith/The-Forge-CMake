@@ -11,3 +11,5 @@ Also Shows how to setup a CMake script for compiling Shaders and copying Directo
 * The Quad Folder Shows How to Render a Quad with Vertex and Index Buffer
 * The Cube Folder Shows How to Render a Cube and Use Dynamic UBO's
 * The 2DSandbox Folder Shows a 2D SpriteBatcher Implementation
+
+CURRENTLY WINDOWS ONLY! MACOS AND LINUX COMING SOON!

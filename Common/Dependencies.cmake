@@ -332,7 +332,7 @@ set(THIRD_PARTY_DEPS
         Bstr
         cJSON
         Eastl
-        Imgui
+        #Imgui
         MiniZip
         RMem
         MeshOptimizer

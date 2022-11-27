@@ -17,7 +17,6 @@ set(FORGE_APP_FILES
         ${FORGE_APP_DIR}/Profiler/ProfilerBase.cpp
         ${FORGE_APP_DIR}/Profiler/ProfilerBase.h
         ${FORGE_APP_DIR}/Profiler/ProfilerHTML.h
-        ${FORGE_APP_DIR}/UI/UI.cpp
         )
 
 set(FORGE_OS_CORE_FILES
@@ -29,7 +28,6 @@ set(FORGE_OS_CORE_FILES
         )
 
 set(FORGE_OS_WINDOWS_FILES
-        ${FORGE_OS_DIR}/Windows/WindowsBase.cpp
         ${FORGE_OS_DIR}/Windows/WindowsFileSystem.cpp
         ${FORGE_OS_DIR}/Windows/WindowsLog.c
         ${FORGE_OS_DIR}/Windows/WindowsStackTraceDump.cpp

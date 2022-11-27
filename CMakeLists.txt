@@ -127,7 +127,4 @@ endif()
 message("\n")
 
 add_subdirectory(Common)
-add_subdirectory(Testing)
-add_subdirectory(Triangle)
-add_subdirectory(Quad)
 add_subdirectory(SDLForge)

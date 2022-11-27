@@ -1,9 +1,0 @@
-#frag triangle.frag
-#include "triangle.frag.fsl"
-#end
-
-#vert triangle.vert
-#include "triangle.vert.fsl"
-#end
-
-

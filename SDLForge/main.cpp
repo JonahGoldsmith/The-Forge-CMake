@@ -14,8 +14,12 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 
-#include "Utilities/Interfaces/IMemory.h"
 #include "Utilities/Interfaces/ITime.h"
+#include "vendor/imgui/imgui_impl_sdl.h"
+
+#include "Utilities/Interfaces/IMemory.h"
+
+
 
 static CpuInfo gCpu;
 static SDL_Window* sdl_window;
@@ -130,11 +134,19 @@ bool Init()
     loadDesc.ppBuffer = &pTriangleVertexBuffer;
     addResource(&loadDesc, NULL);
 
-
     /*
      * Waits on the resource threads...
      */
     waitForAllResourceLoads();
+
+    // setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    //io.Fonts->AddFontFromFileTTF("verdana.ttf", 18.0f, NULL, NULL);
+
+    // Init IMGUI for SDL2....
+    ImGui_ImplSDL2_InitForD3D(sdl_window);
 
     //Set the frame index to 0
     gFrameIndex = 0;
@@ -488,4 +500,23 @@ int main(int argc, char** argv)
     exitMemAlloc();
 
     return 0;
+}
+
+
+/*
+ * These are required for some reason when turning off Forge Base OS Files?
+ */
+void requestShutdown()
+{
+    PostQuitMessage(0);
+}
+
+void requestReset(const ResetDesc* pResetDesc)
+{
+
+}
+
+void requestReload(const ReloadDesc* pReloadDesc)
+{
+
 }
