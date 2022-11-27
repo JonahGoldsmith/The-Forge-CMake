@@ -68,6 +68,7 @@ Semaphore*    pRenderCompleteSemaphores[gImageCount] = { NULL };
 Shader*   pTriangleShader = NULL;
 
 Buffer* pTriangleVertexBuffer = NULL;
+Buffer* pStageBuffer = NULL;
 
 Pipeline* pTrianglePipeline = NULL;
 
@@ -137,7 +138,6 @@ bool Init()
     /*
      * Add a buffer without using the resource loader!
      */
-
     BufferDesc vertDesc = {};
     vertDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
     vertDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
