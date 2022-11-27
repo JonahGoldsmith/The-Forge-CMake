@@ -18,6 +18,20 @@
 
 #include "Utilities/Interfaces/IMemory.h"
 
+DECLARE_RENDERER_FUNCTION(void, addBuffer, Renderer* pRenderer, const BufferDesc* pDesc, Buffer** pp_buffer)
+DECLARE_RENDERER_FUNCTION(void, removeBuffer, Renderer* pRenderer, Buffer* pBuffer)
+DECLARE_RENDERER_FUNCTION(void, mapBuffer, Renderer* pRenderer, Buffer* pBuffer, ReadRange* pRange)
+DECLARE_RENDERER_FUNCTION(void, unmapBuffer, Renderer* pRenderer, Buffer* pBuffer)
+DECLARE_RENDERER_FUNCTION(
+        void, cmdUpdateBuffer, Cmd* pCmd, Buffer* pBuffer, uint64_t dstOffset, Buffer* pSrcBuffer, uint64_t srcOffset, uint64_t size)
+DECLARE_RENDERER_FUNCTION(
+        void, cmdUpdateSubresource, Cmd* pCmd, Texture* pTexture, Buffer* pSrcBuffer, const struct SubresourceDataDesc* pSubresourceDesc)
+DECLARE_RENDERER_FUNCTION(
+        void, cmdCopySubresource, Cmd* pCmd, Buffer* pDstBuffer, Texture* pTexture, const struct SubresourceDataDesc* pSubresourceDesc)
+DECLARE_RENDERER_FUNCTION(void, addTexture, Renderer* pRenderer, const TextureDesc* pDesc, Texture** ppTexture)
+DECLARE_RENDERER_FUNCTION(void, removeTexture, Renderer* pRenderer, Texture* pTexture)
+DECLARE_RENDERER_FUNCTION(void, addVirtualTexture, Cmd* pCmd, const TextureDesc* pDesc, Texture** ppTexture, void* pImageData)
+
 static CpuInfo gCpu;
 static SDL_Window* sdl_window;
 
@@ -120,9 +134,27 @@ bool Init()
     //Size of our vertex buffer
     uint64_t size = sizeof(Vertex) * 3;
 
-    //Use the Resource Loader to Create our Vertex Buffer
-    //Notice How We are using GPU Memory Usage flag...
-    //Cannot access this from the CPU after creation
+    /*
+     * Add a buffer without using the resource loader!
+     */
+
+    BufferDesc vertDesc = {};
+    vertDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
+    vertDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    vertDesc.mSize = sizeof(vertices);
+
+    addBuffer(pRenderer, &vertDesc, &pTriangleVertexBuffer);
+
+    ReadRange readRange = { };
+    readRange.mOffset = 0;
+    readRange.mSize = sizeof(vertices);
+
+    mapBuffer(pRenderer, pTriangleVertexBuffer, &readRange);
+    memcpy(pTriangleVertexBuffer->pCpuMappedAddress, vertices, sizeof(vertices));
+    unmapBuffer(pRenderer, pTriangleVertexBuffer);
+
+    //This is the resource loader way
+    /*
     BufferLoadDesc loadDesc = {};
     loadDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
     loadDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
@@ -130,7 +162,7 @@ bool Init()
     loadDesc.pData = vertices;
     loadDesc.ppBuffer = &pTriangleVertexBuffer;
     addResource(&loadDesc, NULL);
-
+    */
     /*
      * Waits on the resource threads...
      */
