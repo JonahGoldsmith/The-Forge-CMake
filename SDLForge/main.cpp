@@ -15,11 +15,8 @@
 #include <SDL_syswm.h>
 
 #include "Utilities/Interfaces/ITime.h"
-#include "vendor/imgui/imgui_impl_sdl.h"
 
 #include "Utilities/Interfaces/IMemory.h"
-
-
 
 static CpuInfo gCpu;
 static SDL_Window* sdl_window;
@@ -139,15 +136,6 @@ bool Init()
      */
     waitForAllResourceLoads();
 
-    // setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //io.Fonts->AddFontFromFileTTF("verdana.ttf", 18.0f, NULL, NULL);
-
-    // Init IMGUI for SDL2....
-    ImGui_ImplSDL2_InitForD3D(sdl_window);
-
     //Set the frame index to 0
     gFrameIndex = 0;
 
@@ -239,7 +227,6 @@ bool Load()
     pipelineSettings.pBlendState = &blendStateDesc;
     pipelineSettings.pVertexLayout = &vertexLayout;
     addPipeline(pRenderer, &desc, &pTrianglePipeline);
-
     return true;
 }
 
@@ -272,6 +259,7 @@ void Update(float delta)
 
 void Draw()
 {
+
     if (pSwapChain->mEnableVsync != enableVsync)
     {
         waitQueueIdle(pGraphicsQueue);
@@ -323,7 +311,6 @@ void Draw()
     cmdResourceBarrier(cmd, 0, NULL, 0, NULL, 1, barriers);
 
     endCmd(cmd);
-
 
     QueueSubmitDesc submitDesc = {};
     submitDesc.mCmdCount = 1;
