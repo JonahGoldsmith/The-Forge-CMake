@@ -55,6 +55,7 @@ static bool enableVsync = true;
  */
 Renderer* pRenderer;
 
+
 Queue*   pGraphicsQueue = NULL;
 CmdPool* pCmdPools[gImageCount] = { NULL };
 Cmd*     pCmds[gImageCount] = { NULL };
@@ -115,6 +116,7 @@ bool Init()
     queueDesc.mType = QUEUE_TYPE_GRAPHICS;
     queueDesc.mFlag = QUEUE_FLAG_INIT_MICROPROFILE;
     addQueue(pRenderer, &queueDesc, &pGraphicsQueue);
+
 
     for (uint32_t i = 0; i < gImageCount; ++i)
     {

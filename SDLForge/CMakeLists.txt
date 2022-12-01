@@ -2,11 +2,7 @@ cmake_minimum_required(VERSION 3.6)
 
 project(SDLForge)
 
-add_executable(${PROJECT_NAME} main.cpp
-        vendor/imgui/imgui_impl_sdl.cpp
-        vendor/imgui/imgui_impl_sdl.h
-        vendor/imgui/imgui_impl_dx12.cpp
-        vendor/imgui/imgui_impl_dx12.h)
+add_executable(${PROJECT_NAME} main.cpp)
 
 add_subdirectory(vendor/SDL-SDL2)
 add_subdirectory(vendor/imgui)
