@@ -1,4 +1,6 @@
 [submodule "The-Forge"]
 	path = The-Forge
 	url = https://github.com/JonahGoldsmith/The-Forge
-
+[submodule "Cube/vendor/tinyobj"]
+	path = Cube/vendor/tinyobj
+	url = https://github.com/tinyobjloader/tinyobjloader
