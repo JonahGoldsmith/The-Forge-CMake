@@ -44,23 +44,26 @@ Pipeline* pQuadPipeline = NULL;
 
 RootSignature* pRootSignature = NULL;
 
+Texture* pTexture = NULL;
+
 //Structure for our Vertices
 struct Vertex
 {
     Vector3 position;
     Vector4 color;
+    Vector2 uv;
 };
 
 //Basic Vertices for a Triangle
 Vertex vertices[4] = {
-        {{-0.5, 0.5, 0.0}, {1.0, 0.0, 0.0, 1.0}},
-        {{0.5, -0.5, 0.0}, {0.0, 1.0, 0.0, 1.0}},
-        {{-0.5, -0.5, 0.0}, {0.0, 0.0, 1.0, 1.0}},
-        {{0.5, 0.5, 0.0}, {1.0, 1.0, 1.0, 1.0}}
+        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
 };
 
 uint16_t indices[] = {
-        0, 1, 2, 0, 3, 1
+        0, 1, 2, 2, 3, 0
 };
 
 class Triangle : public IApp
