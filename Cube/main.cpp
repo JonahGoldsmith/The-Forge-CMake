@@ -367,20 +367,21 @@ public:
 
         float time = deltaTime;
 
-
         const float aspectInverse = (float)mSettings.mHeight / (float)mSettings.mWidth;
 
         Matrix4 proj = Matrix4::perspective((45.0f*3.14)/180.0f, aspectInverse, 0.1f, 100.0f);
 
+      // Matrix4 proj = Matrix4::orthographic(0, mSettings.mWidth, 0, mSettings.mHeight, 0.1f, 100.0f);
+
         Matrix4 view = Matrix4::identity();
         //view = Matrix4::scale(Vector3(0.5));
-        view.setTranslation(Vector3(0.0, 0.0, 1));
+        //view.setTranslation(Vector3(0.0, 0.0, 0.0));
 
         model.setTranslation(Vector3(0, 0, 10));
         model *= Matrix4::rotation((15.0f*3.14)/180.0f * deltaTime, vec3(0.0, 1.0, 1.0));
         //model *= Matrix4::rotation(45.0f, Vector3(0, 0, 1));
         Matrix4 temp = Matrix4(proj * view);
-        uniformBlock.mvp = Matrix4(temp * model);
+        uniformBlock.mvp = proj * view * model;
         //uniformBlock.mvp = transpose(uniformBlock.mvp);
     }
 
