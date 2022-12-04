@@ -2,3 +2,9 @@
 	path = The-Forge
 	url = https://github.com/JonahGoldsmith/The-Forge
 
+[submodule "SDLForge/vendor/fiber-job-system"]
+	path = SDLForge/vendor/fiber-job-system
+	url = https://github.com/Freeeaky/fiber-job-system
+[submodule "SDLForge2/vendor/tinyobjloader"]
+	path = SDLForge2/vendor/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader

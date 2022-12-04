@@ -1,0 +1,27 @@
+
+CBUFFER(cameraUniform, UPDATE_FREQ_PER_FRAME, b0, binding = 0)
+{
+    DATA(float4x4, projview, None);
+};
+
+STRUCT(VSInput)
+{
+	DATA(float3, Position, POSITION);
+	DATA(float4, Color,   COLOR);
+};
+
+STRUCT(VSOutput)
+{
+	DATA(float4, Position, SV_Position);
+	DATA(float4, Color,    COLOR);
+};
+
+VSOutput VS_MAIN( VSInput In )
+{
+    INIT_MAIN;
+    VSOutput Out;
+    Out.Position = mul(Get(projview), float4(In.Position, 1.0));
+    Out.Color = In.Color;
+
+    RETURN(Out);
+}

@@ -1,16 +1,14 @@
 cmake_minimum_required(VERSION 3.6)
 
-project(SDLForge)
+project(SDLForge2)
 
 add_executable(${PROJECT_NAME} main.cpp)
 
-add_subdirectory(vendor/SDL-SDL2)
-add_subdirectory(vendor/imgui)
-add_subdirectory(vendor/fiber-job-system)
+add_subdirectory(vendor/tinyobjloader)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static IMGUI fjs)
+target_link_libraries(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static fjs tinyobjloader)
 
-target_include_directories(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static IMGUI fjs)
+target_include_directories(${PROJECT_NAME} PUBLIC The-Forge SDL2main SDL2-static fjs tinyobjloader)
 
 
 if (${WINDOWS} MATCHES ON)
@@ -93,3 +91,9 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/GPUCfg
         ${CMAKE_CURRENT_BINARY_DIR}/GPUCfg)
+
+add_custom_command(
+        TARGET ${PROJECT_NAME} PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/cube.obj
+        ${CMAKE_CURRENT_BINARY_DIR}/cube.obj)
