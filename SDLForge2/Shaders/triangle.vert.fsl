@@ -1,4 +1,7 @@
 
+RES(Tex2D(float4),  Tex0,  UPDATE_FREQ_NONE, t1, binding = 1);
+RES(SamplerState,  uSampler0, UPDATE_FREQ_NONE, s0, binding = 2);
+
 CBUFFER(cameraUniform, UPDATE_FREQ_PER_FRAME, b0, binding = 0)
 {
     DATA(float4x4, projview, None);
@@ -8,12 +11,14 @@ STRUCT(VSInput)
 {
 	DATA(float3, Position, POSITION);
 	DATA(float4, Color,   COLOR);
+	DATA(float2, UV, TEXCOORD0);
 };
 
 STRUCT(VSOutput)
 {
 	DATA(float4, Position, SV_Position);
 	DATA(float4, Color,    COLOR);
+	DATA(float2, UV, TEXCOORD0);
 };
 
 VSOutput VS_MAIN( VSInput In )
@@ -22,6 +27,6 @@ VSOutput VS_MAIN( VSInput In )
     VSOutput Out;
     Out.Position = mul(Get(projview), float4(In.Position, 1.0));
     Out.Color = In.Color;
-
+    Out.UV = In.UV;
     RETURN(Out);
 }

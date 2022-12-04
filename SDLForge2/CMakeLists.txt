@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.6)
 
 project(SDLForge2)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp stb_image.h)
 
 add_subdirectory(vendor/tinyobjloader)
 

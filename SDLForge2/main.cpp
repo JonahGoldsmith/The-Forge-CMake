@@ -9,6 +9,12 @@
 #include "Graphics/Interfaces/IGraphics.h"
 #include "Resources/ResourceLoader/Interfaces/IResourceLoader.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_MALLOC tf_malloc
+#define STBI_REALLOC tf_realloc
+#define STBI_FREE tf_free
+#include "stb_image.h"
+
 //Math
 #include "Utilities/Math/MathTypes.h"
 #include <SDL.h>
@@ -41,6 +47,17 @@ DECLARE_RENDERER_FUNCTION(
 DECLARE_RENDERER_FUNCTION(void, addTexture, Renderer* pRenderer, const TextureDesc* pDesc, Texture** ppTexture)
 DECLARE_RENDERER_FUNCTION(void, removeTexture, Renderer* pRenderer, Texture* pTexture)
 DECLARE_RENDERER_FUNCTION(void, addVirtualTexture, Cmd* pCmd, const TextureDesc* pDesc, Texture** ppTexture, void* pImageData)
+
+struct SubresourceDataDesc
+{
+    uint64_t mSrcOffset;
+    uint32_t mMipLevel;
+    uint32_t mArrayLayer;
+#if defined(DIRECT3D11) || defined(METAL) || defined(VULKAN)
+    uint32_t mRowPitch;
+    uint32_t mSlicePitch;
+#endif
+};
 
 static CpuInfo gCpu;
 static SDL_Window* sdl_window;
@@ -90,10 +107,13 @@ Buffer* pIndexBuffer = NULL;
 Buffer* pStageBuffer = NULL;
 Buffer* pCameraUniformBuffers[gImageCount] = { NULL };
 
+Texture* pTexture;
+Sampler*       pLinearClampSampler = NULL;
+
 Pipeline* pTrianglePipeline = NULL;
 
 RootSignature* pRootSignature = NULL;
-//DescriptorSet* pDescriptorSetTexture = NULL;
+DescriptorSet* pDescriptorSetTexture = NULL;
 DescriptorSet* pDescriptorSetUniforms = { NULL };
 
 struct Mesh
@@ -112,6 +132,7 @@ struct Vertex
 {
     Vector3 position;
     Vector4 color;
+    Vector2 uv;
 };
 
 Vertex* vertices = NULL;
@@ -131,6 +152,10 @@ fjs::ManagerOptions managerOptions;
 fjs::Manager* gManager;
 
 Matrix4 view = Matrix4::identity();
+
+Vector3 viewTransform = Vector3(0, 0, 10);
+
+extern RendererApi gSelectedRendererApi;
 
 static void LoadModel(char* file)
 {
@@ -153,14 +178,14 @@ static void LoadModel(char* file)
                     attrib.vertices[3 * index.vertex_index + 2]
             };
 
-            /*
+
             vertex.uv = {
                     attrib.texcoords[2 * index.texcoord_index + 0],
                     attrib.texcoords[2 * index.texcoord_index + 1]
             };
-            */
 
-            vertex.color = {1.0f, 0.0f, 1.0f, 1.0f};
+
+            vertex.color = {1.0f, 1.0f, 1.0f, 1.0f};
 
             arrpush(vertices, vertex);
             if(!indices)
@@ -226,7 +251,13 @@ bool Init()
     }
     addSemaphore(pRenderer, &pImageAcquiredSemaphore);
 
-   // initResourceLoaderInterface(pRenderer);
+    SamplerDesc samplerDesc = { FILTER_LINEAR,
+                                FILTER_LINEAR,
+                                MIPMAP_MODE_LINEAR,
+                                ADDRESS_MODE_CLAMP_TO_EDGE,
+                                ADDRESS_MODE_CLAMP_TO_EDGE,
+                                ADDRESS_MODE_CLAMP_TO_EDGE };
+    addSampler(pRenderer, &samplerDesc, &pLinearClampSampler);
 
     //Size of our vertex buffer
     uint64_t size = sizeof(Vertex) * 3;
@@ -281,16 +312,16 @@ bool Init()
 
     removeBuffer(pRenderer, pStageBuffer);
 
-    stageDesc.mDescriptors = DESCRIPTOR_TYPE_UNDEFINED;
-    stageDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
-    stageDesc.mSize = sizeof(uint32_t) * arrlenu(indices);
-    addBuffer(pRenderer, &stageDesc, &pStageBuffer);
-
     BufferDesc ibDesc = {};
     ibDesc.mDescriptors = DESCRIPTOR_TYPE_INDEX_BUFFER;
     ibDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
     ibDesc.mSize = sizeof(uint32_t)*arrlenu(indices);
     addBuffer(pRenderer, &ibDesc, &pIndexBuffer);
+
+    stageDesc.mDescriptors = DESCRIPTOR_TYPE_UNDEFINED;
+    stageDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    stageDesc.mSize = sizeof(uint32_t) * arrlenu(indices);
+    addBuffer(pRenderer, &stageDesc, &pStageBuffer);
 
     readRange.mOffset = 0;
     readRange.mSize = sizeof(uint32_t) * arrlenu(indices);
@@ -313,6 +344,82 @@ bool Init()
     waitForFences(pRenderer, 1, &pTransferFence);
 
     removeBuffer(pRenderer, pStageBuffer);
+
+    LOGF(LogLevel::eDEBUG, "Testing");
+
+    //TODO TEXTURELOADER
+    {
+        int texWidth, texHeight, texChannels;
+
+        unsigned char* pixels = stbi_load("test.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+        if (!pixels) {
+            LOGF(LogLevel::eERROR, "Failed to load texture file!");
+            //std::cout << "Failed to load texture file " << file << std::endl;
+            return false;
+        }
+
+        void* pixel_ptr = pixels;
+
+        int imageSize = texWidth * texHeight * 4;
+
+        stageDesc.mDescriptors = DESCRIPTOR_TYPE_UNDEFINED;
+        stageDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+        stageDesc.mSize = imageSize;
+        addBuffer(pRenderer, &stageDesc, &pStageBuffer);
+
+        readRange.mOffset = 0;
+        readRange.mSize = imageSize;
+
+        mapBuffer(pRenderer, pStageBuffer, &readRange);
+        memcpy(pStageBuffer->pCpuMappedAddress, pixel_ptr, imageSize);
+        unmapBuffer(pRenderer, pStageBuffer);
+
+        TextureDesc texDesc = {};
+        texDesc.mArraySize = 1;
+        texDesc.mDepth = 1;
+        texDesc.mFormat = TinyImageFormat_R8G8B8A8_UNORM;
+        texDesc.mMipLevels = 1;
+        texDesc.mSampleCount = SAMPLE_COUNT_1;
+        texDesc.mStartState = RESOURCE_STATE_UNDEFINED;
+        texDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
+        texDesc.mWidth = texWidth;
+        texDesc.mHeight = texHeight;
+        texDesc.mFlags = TEXTURE_CREATION_FLAG_SRGB;
+        addTexture(pRenderer, &texDesc, &pTexture);
+
+        resetCmdPool(pRenderer, pTransferCmdPool);
+        beginCmd(pTransferCmd);
+        SubresourceDataDesc subDesc = {};
+        subDesc.mArrayLayer = 0;
+        subDesc.mSrcOffset = 0;
+        subDesc.mMipLevel = 0;
+        subDesc.mRowPitch = 1;
+        subDesc.mSlicePitch = 0;
+        TextureBarrier barrier;
+if(gSelectedRendererApi == RENDERER_API_VULKAN) {
+    barrier = {pTexture, RESOURCE_STATE_UNDEFINED, RESOURCE_STATE_COPY_DEST};
+    cmdResourceBarrier(pTransferCmd, 0, NULL, 1, &barrier, 0, NULL);
+}
+        cmdUpdateSubresource(pTransferCmd, pTexture, pStageBuffer, &subDesc);
+if(gSelectedRendererApi == RENDERER_API_VULKAN) {
+            barrier = {pTexture, RESOURCE_STATE_COPY_DEST, RESOURCE_STATE_SHADER_RESOURCE};
+            cmdResourceBarrier(pTransferCmd, 0, NULL, 1, &barrier, 0, NULL);
+        }
+
+        endCmd(pTransferCmd);
+        submitDesc.mCmdCount = 1;
+        submitDesc.mSignalSemaphoreCount = 0;
+        submitDesc.mWaitSemaphoreCount = 0;
+        submitDesc.ppCmds = &pTransferCmd;
+        submitDesc.pSignalFence = pTransferFence;
+        queueSubmit(pTransferQueue, &submitDesc);
+        waitForFences(pRenderer, 1, &pTransferFence);
+
+        stbi_image_free(pixel_ptr);
+        removeBuffer(pRenderer, pStageBuffer);
+    }
+
 
     //Set the frame index to 0
     gFrameIndex = 0;
@@ -371,13 +478,24 @@ bool Load()
 
     addShader(pRenderer, &basicShader, &pTriangleShader);
 
+    const char*       pStaticSamplers[] = { "uSampler0" };
     RootSignatureDesc rootDesc = { &pTriangleShader, 1 };
-    rootDesc.mStaticSamplerCount = 0;
+    rootDesc.mStaticSamplerCount = 1;
+    rootDesc.ppStaticSamplerNames = pStaticSamplers;
+    rootDesc.ppStaticSamplers = &pLinearClampSampler;
     addRootSignature(pRenderer, &rootDesc, &pRootSignature);
     {
         DescriptorSetDesc desc = {pRootSignature, DESCRIPTOR_UPDATE_FREQ_PER_FRAME, gImageCount};
         addDescriptorSet(pRenderer, &desc, &pDescriptorSetUniforms);
+        desc = {pRootSignature, DESCRIPTOR_UPDATE_FREQ_NONE, 1};
+        addDescriptorSet(pRenderer, &desc, &pDescriptorSetTexture);
     }
+
+    DescriptorData param[1] = {};
+    param[0].pName = "Tex0";
+    param[0].ppTextures = &pTexture;
+    updateDescriptorSet(pRenderer, 0, pDescriptorSetTexture, 1, param);
+
     for (uint32_t i = 0; i < gImageCount; ++i)
     {
         DescriptorData params[1] = {};
@@ -394,7 +512,7 @@ bool Load()
 
     //layout and pipeline for sphere draw
     VertexLayout vertexLayout = {};
-    vertexLayout.mAttribCount = 2;
+    vertexLayout.mAttribCount = 3;
     vertexLayout.mAttribs[0].mSemantic = SEMANTIC_POSITION;
     vertexLayout.mAttribs[0].mFormat = TinyImageFormat_R32G32B32_SFLOAT;
     vertexLayout.mAttribs[0].mBinding = 0;
@@ -407,11 +525,11 @@ bool Load()
     vertexLayout.mAttribs[1].mLocation = 1;
     vertexLayout.mAttribs[1].mOffset = offsetof(Vertex, color);
 
-//    vertexLayout.mAttribs[2].mSemantic = SEMANTIC_TEXCOORD0;
-//    vertexLayout.mAttribs[2].mFormat = TinyImageFormat_R32G32_SFLOAT;
-//    vertexLayout.mAttribs[2].mBinding = 0;
-//    vertexLayout.mAttribs[2].mLocation = 2;
-//    vertexLayout.mAttribs[2].mOffset = offsetof(Vertex, uv);
+    vertexLayout.mAttribs[2].mSemantic = SEMANTIC_TEXCOORD0;
+    vertexLayout.mAttribs[2].mFormat = TinyImageFormat_R32G32_SFLOAT;
+    vertexLayout.mAttribs[2].mBinding = 0;
+    vertexLayout.mAttribs[2].mLocation = 2;
+    vertexLayout.mAttribs[2].mOffset = offsetof(Vertex, uv);
 
     RasterizerStateDesc sphereRasterizerStateDesc = {};
     sphereRasterizerStateDesc.mCullMode = CULL_MODE_FRONT;
@@ -450,6 +568,7 @@ void Unload()
 
     removeSwapChain(pRenderer, pSwapChain);
 
+    removeDescriptorSet(pRenderer, pDescriptorSetTexture);
     removeDescriptorSet(pRenderer, pDescriptorSetUniforms);
 
     removeRootSignature(pRenderer, pRootSignature);
@@ -469,12 +588,12 @@ void Update(float delta)
 {
     const float aspectInverse = (float)height / (float)width;
 
-    Matrix4 proj = Matrix4::perspective((45.0f*3.14)/180.0f, aspectInverse, 0.1f, 100.0f);
+    Matrix4 proj = Matrix4::perspective((45.0f*3.14)/180.0f, aspectInverse, 0.1f, 1000.0f);
 
     // Matrix4 proj = Matrix4::orthographic(0, mSettings.mWidth, 0, mSettings.mHeight, 0.1f, 100.0f);
 
     //view = Matrix4::scale(Vector3(0.5));
-    view.setTranslation(Vector3(0.0, 0.0, 10));
+    view.setTranslation(viewTransform);
     view *= Matrix4::rotation((15.0f*3.14)/180.0f * delta, vec3(0.0, 1.0, 1.0));
     //model.setTranslation(Vector3(0, 0, 10));
 
@@ -513,10 +632,6 @@ void Draw()
     memcpy(pCameraUniformBuffers[gFrameIndex]->pCpuMappedAddress, &cameraUniforms, sizeof(CameraUniforms));
     unmapBuffer(pRenderer, pCameraUniformBuffers[gFrameIndex]);
 
-//    BufferUpdateDesc viewProjCbv = { pProjViewUniformBuffer[gFrameIndex] };
-//    beginUpdateResource(&viewProjCbv);
-//    *(UniformBlock*)viewProjCbv.pMappedData = uniformBlock;
-//    endUpdateResource(&viewProjCbv, NULL);
 
     // Reset cmd pool for this frame
     resetCmdPool(pRenderer, pCmdPools[gFrameIndex]);
@@ -544,6 +659,7 @@ void Draw()
 
     cmdBindPipeline(cmd, pipeline);
     cmdBindDescriptorSet(cmd, gFrameIndex, pDescriptorSetUniforms);
+    cmdBindDescriptorSet(cmd, 0, pDescriptorSetTexture);
     cmdBindVertexBuffer(cmd, 1, &pTriangleVertexBuffer, &sphereVbStride, NULL);
     cmdBindIndexBuffer(cmd, pIndexBuffer, INDEX_TYPE_UINT32, 0);
 
@@ -583,6 +699,8 @@ void Draw()
 
 void Exit()
 {
+    removeTexture(pRenderer, pTexture);
+
     for (uint32_t i = 0; i < gImageCount; ++i)
     {
         removeBuffer(pRenderer, pCameraUniformBuffers[i]);
@@ -590,6 +708,8 @@ void Exit()
 
     removeBuffer(pRenderer, pIndexBuffer);
     removeBuffer(pRenderer, pTriangleVertexBuffer);
+
+    removeSampler(pRenderer, pLinearClampSampler);
 
     removeFence(pRenderer, pTransferFence);
     removeCmd(pRenderer, pTransferCmd);
@@ -658,6 +778,23 @@ void engineTick(int* x)
         {
             switch(e.type)
             {
+                case SDL_KEYDOWN:
+                    switch(e.key.keysym.sym)
+                    {
+                        case SDLK_s:
+                            viewTransform.setZ(viewTransform.getZ() + 0.5);
+                            break;
+                        case SDLK_w:
+                            viewTransform.setZ(viewTransform.getZ() - 0.5);
+                            break;
+                        case SDLK_a:
+                            viewTransform.setX(viewTransform.getX() + 0.5);
+                            break;
+                        case SDLK_d:
+                            viewTransform.setX(viewTransform.getX() - 0.5);
+                            break;
+                    }
+                    break;
                 case SDL_QUIT:
                     quit = true;
                     break;
@@ -751,6 +888,8 @@ int main(int argc, char** argv)
 #endif
     Timer t;
     initTimer(&t);
+
+    gSelectedRendererApi = RENDERER_API_D3D12;
 
     if(!Init())
     {
