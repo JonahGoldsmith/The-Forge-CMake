@@ -57,6 +57,7 @@ Vertex vertices[3] = {
         {{-0.5, -0.5, 0.0}, {0.0, 0.0, 1.0, 1.0}}
 };
 
+extern RendererApi gSelectedRendererApi;
 
 class Triangle : public IApp
 {
@@ -69,6 +70,8 @@ class Triangle : public IApp
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_SHADER_SOURCES, "Shaders");
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_SHADER_BINARIES, "CompiledShaders");
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_GPU_CONFIG, "GPUCfg");
+
+        gSelectedRendererApi = RENDERER_API_VULKAN;
 
         /*
          * Init the renderer with no fancy requirements

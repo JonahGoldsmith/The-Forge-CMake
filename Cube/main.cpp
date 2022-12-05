@@ -135,9 +135,9 @@ UniformBlock uniformBlock;
 
 struct MeshVertex
 {
-    Vector3 pos;
-    Vector4 color;
-    Vector2 uv;
+    float pos[3];
+    float color[4];
+    float uv[2];
 };
 
 std::vector<MeshVertex> vertices;
@@ -157,20 +157,17 @@ void loadModel(char* file) {
         for (const auto& index : shape.mesh.indices) {
             MeshVertex vertex{};
 
-            vertex.pos = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2]
-            };
+            vertex.pos[0] = attrib.vertices[3 * index.vertex_index + 0];
+            vertex.pos[1] = attrib.vertices[3 * index.vertex_index + 1];
+            vertex.pos[2] = attrib.vertices[3 * index.vertex_index + 2];
 
+            vertex.uv[0] = attrib.texcoords[2 * index.texcoord_index + 0];
+            vertex.uv[1] = attrib.texcoords[2 * index.texcoord_index + 1];
 
-            vertex.uv = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    attrib.texcoords[2 * index.texcoord_index + 1]
-            };
-
-
-            vertex.color = {1.0f, 1.0f, 1.0f, 1.0f};
+            vertex.color[0] = 1.0f;
+            vertex.color[1]= 1.0f;
+            vertex.color[2]= 1.0f;
+            vertex.color[3]= 1.0f;
 
             vertices.push_back(vertex);
             indices.push_back(indices.size());
@@ -179,15 +176,20 @@ void loadModel(char* file) {
 
 }
 
+extern RendererApi gSelectedRendererApi;
+
 class Cube: public IApp {
 public:
 
     bool Init() {
+
         // FILE PATHS
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_SHADER_SOURCES, "Shaders");
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_SHADER_BINARIES, "CompiledShaders");
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_GPU_CONFIG, "GPUCfg");
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_TEXTURES, "Textures");
+
+        gSelectedRendererApi = RENDERER_API_VULKAN;
 
         // window and renderer setup
         RendererDesc settings;
@@ -252,7 +254,7 @@ public:
 
         uint64_t       cubeIndexSize = sizeof(uint32_t) * indices.size();
         BufferLoadDesc cubeIBDesc = {};
-        cubeIBDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
+        cubeIBDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_INDEX_BUFFER;
         cubeIBDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
         cubeIBDesc.mDesc.mSize = cubeIndexSize;
         cubeIBDesc.pData = indices.data();

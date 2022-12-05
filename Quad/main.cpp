@@ -49,22 +49,23 @@ Texture* pTexture = NULL;
 //Structure for our Vertices
 struct Vertex
 {
-    Vector3 position;
-    Vector4 color;
-    Vector2 uv;
+    float position[3];
+    float color[4];
 };
 
 //Basic Vertices for a Triangle
 Vertex vertices[4] = {
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
+        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}
 };
 
 uint16_t indices[] = {
         0, 1, 2, 2, 3, 0
 };
+
+extern RendererApi gSelectedRendererApi;
 
 class Triangle : public IApp
 {
@@ -77,6 +78,8 @@ class Triangle : public IApp
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_SHADER_SOURCES, "Shaders");
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_SHADER_BINARIES, "CompiledShaders");
         fsSetPathForResourceDir(pSystemFileIO, RM_CONTENT, RD_GPU_CONFIG, "GPUCfg");
+
+        gSelectedRendererApi = RENDERER_API_D3D12;
 
         /*
          * Init the renderer with no fancy requirements
@@ -239,7 +242,7 @@ class Triangle : public IApp
             vertexLayout.mAttribs[0].mLocation = 0;
             vertexLayout.mAttribs[0].mOffset = 0;
             vertexLayout.mAttribs[1].mSemantic = SEMANTIC_COLOR;
-            vertexLayout.mAttribs[1].mFormat = TinyImageFormat_R32G32B32_SFLOAT;
+            vertexLayout.mAttribs[1].mFormat = TinyImageFormat_R32G32B32A32_SFLOAT;
             vertexLayout.mAttribs[1].mBinding = 0;
             vertexLayout.mAttribs[1].mLocation = 1;
             vertexLayout.mAttribs[1].mOffset = offsetof(Vertex, color);
@@ -362,6 +365,7 @@ class Triangle : public IApp
         cmdBindIndexBuffer(cmd, pQuadIndexBuffer, INDEX_TYPE_UINT16, 0);
         cmdDrawIndexed(cmd, 6, 0, 0);
 
+        cmdBindRenderTargets(cmd, 0, NULL, NULL, NULL, NULL, NULL, -1, -1);
         barriers[0] = { pRenderTarget, RESOURCE_STATE_RENDER_TARGET, RESOURCE_STATE_PRESENT };
         cmdResourceBarrier(cmd, 0, NULL, 0, NULL, 1, barriers);
 
