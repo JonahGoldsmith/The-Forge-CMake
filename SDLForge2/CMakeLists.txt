@@ -97,3 +97,9 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/cube.obj
         ${CMAKE_CURRENT_BINARY_DIR}/cube.obj)
+
+add_custom_command(
+        TARGET ${PROJECT_NAME} PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/test.jpg
+        ${CMAKE_CURRENT_BINARY_DIR}/test.jpg)

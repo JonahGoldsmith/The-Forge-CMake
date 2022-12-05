@@ -8,6 +8,7 @@
 //Renderer
 #include "Graphics/Interfaces/IGraphics.h"
 #include "Resources/ResourceLoader/Interfaces/IResourceLoader.h"
+#include "Application/Interfaces/ICameraController.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_MALLOC tf_malloc
@@ -106,6 +107,7 @@ Buffer* pTriangleVertexBuffer = NULL;
 Buffer* pIndexBuffer = NULL;
 Buffer* pStageBuffer = NULL;
 Buffer* pCameraUniformBuffers[gImageCount] = { NULL };
+Buffer* pInstanceDataBuffers[gImageCount] = { NULL };
 
 Texture* pTexture;
 Sampler*       pLinearClampSampler = NULL;
@@ -116,6 +118,8 @@ RootSignature* pRootSignature = NULL;
 DescriptorSet* pDescriptorSetTexture = NULL;
 DescriptorSet* pDescriptorSetUniforms = { NULL };
 
+ICameraController* pCameraController = NULL;
+
 struct Mesh
 {
     Buffer* pVertexBuffer;
@@ -124,15 +128,17 @@ struct Mesh
 
 struct InstanceData
 {
-    Matrix4 model;
+    Matrix4 model = Matrix4::identity();
 };
+
+InstanceData instanceData[100];
 
 //Structure for our Vertices
 struct Vertex
 {
-    Vector3 position;
-    Vector4 color;
-    Vector2 uv;
+    float3 position;
+    float4 color;
+    float2 uv;
 };
 
 Vertex* vertices = NULL;
@@ -153,9 +159,10 @@ fjs::Manager* gManager;
 
 Matrix4 view = Matrix4::identity();
 
-Vector3 viewTransform = Vector3(0, 0, 10);
+Vector3 viewTransform = Vector3(0, -2, 10);
 
 extern RendererApi gSelectedRendererApi;
+float delta;
 
 static void LoadModel(char* file)
 {
@@ -273,8 +280,27 @@ bool Init()
     }
 
     /*
- * Add a buffer without using the resource loader!
- */
+     * Add the instance buffer
+     */
+
+    // Instance buffer
+    BufferDesc instanceDesc = {};
+    instanceDesc.mDescriptors = DESCRIPTOR_TYPE_BUFFER;
+    instanceDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    //instanceDesc.mDesc.mFlags = BUFFER_CREATION_FLAG_PERSISTENT_MAP_BIT;
+    instanceDesc.mFirstElement = 0;
+    instanceDesc.mElementCount = 100;
+    instanceDesc.mStructStride = sizeof(InstanceData);
+    instanceDesc.mSize = 100 * instanceDesc.mStructStride;
+    for (uint32_t i = 0; i < gImageCount; ++i)
+    {
+        addBuffer(pRenderer, &instanceDesc, &pInstanceDataBuffers[i]);
+    }
+
+    /*
+     * Add the mesh to our vertex buffer! Only one mesh for now!
+     */
+
     BufferDesc vertDesc = {};
     vertDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
     vertDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
@@ -381,7 +407,7 @@ bool Init()
         texDesc.mFormat = TinyImageFormat_R8G8B8A8_UNORM;
         texDesc.mMipLevels = 1;
         texDesc.mSampleCount = SAMPLE_COUNT_1;
-        texDesc.mStartState = RESOURCE_STATE_UNDEFINED;
+        texDesc.mStartState = RESOURCE_STATE_COPY_DEST;
         texDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
         texDesc.mWidth = texWidth;
         texDesc.mHeight = texHeight;
@@ -419,6 +445,14 @@ if(gSelectedRendererApi == RENDERER_API_VULKAN) {
         stbi_image_free(pixel_ptr);
         removeBuffer(pRenderer, pStageBuffer);
     }
+
+    CameraMotionParameters cmp{60.0f, 200.0f, 200.0f};
+    vec3                   camPos{0.0f, 0.0f, -10.0f};
+    vec3                   lookAt{vec3(0)};
+
+    pCameraController = initFpsCameraController(camPos, lookAt);
+
+    pCameraController->setMotionParameters(cmp);
 
 
     //Set the frame index to 0
@@ -498,10 +532,12 @@ bool Load()
 
     for (uint32_t i = 0; i < gImageCount; ++i)
     {
-        DescriptorData params[1] = {};
+        DescriptorData params[2] = {};
         params[0].pName = "cameraUniform";
         params[0].ppBuffers = &pCameraUniformBuffers[i];
-        updateDescriptorSet(pRenderer, i, pDescriptorSetUniforms, 1, params);
+        params[1].pName = "instanceBuffer";
+        params[1].ppBuffers = &pInstanceDataBuffers[i];
+        updateDescriptorSet(pRenderer, i, pDescriptorSetUniforms, 2, params);
     }
 
     if (!createSwapChain())
@@ -586,18 +622,33 @@ void Resize(int inWidth, int inHeight)
 
 void Update(float delta)
 {
+    delta = delta;
+    pCameraController->update(delta);
+    // update camera with time
+    view = pCameraController->getViewMatrix();
     const float aspectInverse = (float)height / (float)width;
 
-    Matrix4 proj = Matrix4::perspective((45.0f*3.14)/180.0f, aspectInverse, 0.1f, 1000.0f);
+    Matrix4 proj = Matrix4::perspective((90.0f*3.14)/180.0f, aspectInverse, 0.1f, 1000.0f);
 
-    // Matrix4 proj = Matrix4::orthographic(0, mSettings.mWidth, 0, mSettings.mHeight, 0.1f, 100.0f);
+    Matrix4 model;
+    model = instanceData[0].model;
+    model.setTranslation(Vector3(2.0, 0.0, 0.0));
+    model *= Matrix4::rotationZ((15.0f*3.14)/180.0f*delta);
+    instanceData[0].model = model;
+    model = instanceData[1].model;
+    model.setTranslation(Vector3(-2.0, 0.0, 0.0));
+    model *= Matrix4::rotationY((15.0f*3.14)/180.0f*delta);
+    instanceData[1].model = model;
+    model = Matrix4::identity();
+    model = Matrix4::scale(Vector3(6, 0.5, 10.0));
+    model.setTranslation(Vector3(0.0, -4.0, 0.0));
+    instanceData[2].model = model;
 
-    //view = Matrix4::scale(Vector3(0.5));
-    view.setTranslation(viewTransform);
-    view *= Matrix4::rotation((15.0f*3.14)/180.0f * delta, vec3(0.0, 1.0, 1.0));
-    //model.setTranslation(Vector3(0, 0, 10));
+    //view = Matrix4::rotationX(-30.0*3.14/180);
+    //view.setTranslation(viewTransform);
 
-    //model *= Matrix4::rotation(45.0f, Vector3(0, 0, 1));
+
+
     cameraUniforms.projview = proj * view;
 }
 
@@ -632,6 +683,15 @@ void Draw()
     memcpy(pCameraUniformBuffers[gFrameIndex]->pCpuMappedAddress, &cameraUniforms, sizeof(CameraUniforms));
     unmapBuffer(pRenderer, pCameraUniformBuffers[gFrameIndex]);
 
+    int drawCount = 3;
+    range.mSize = sizeof(InstanceData) * drawCount;
+    range.mOffset = 0;
+    // Update uniform buffers
+    mapBuffer(pRenderer, pInstanceDataBuffers[gFrameIndex], &range);
+    memcpy(pInstanceDataBuffers[gFrameIndex]->pCpuMappedAddress, instanceData, sizeof(InstanceData) * drawCount);
+    unmapBuffer(pRenderer, pInstanceDataBuffers[gFrameIndex]);
+
+
 
     // Reset cmd pool for this frame
     resetCmdPool(pRenderer, pCmdPools[gFrameIndex]);
@@ -663,7 +723,7 @@ void Draw()
     cmdBindVertexBuffer(cmd, 1, &pTriangleVertexBuffer, &sphereVbStride, NULL);
     cmdBindIndexBuffer(cmd, pIndexBuffer, INDEX_TYPE_UINT32, 0);
 
-    cmdDrawIndexed(cmd, arrlenu(indices), 0, 0);
+    cmdDrawIndexedInstanced(cmd, arrlenu(indices), 0, drawCount, 0, 0);
 
     loadActions = {};
     loadActions.mLoadActionsColor[0] = LOAD_ACTION_LOAD;
@@ -699,11 +759,15 @@ void Draw()
 
 void Exit()
 {
+
+    exitCameraController(pCameraController);
+
     removeTexture(pRenderer, pTexture);
 
     for (uint32_t i = 0; i < gImageCount; ++i)
     {
         removeBuffer(pRenderer, pCameraUniformBuffers[i]);
+        removeBuffer(pRenderer, pInstanceDataBuffers[i]);
     }
 
     removeBuffer(pRenderer, pIndexBuffer);
@@ -757,11 +821,15 @@ static inline float CounterToSecondsElapsed(int64_t start, int64_t end)
  * LOGGING
  */
 
+int dirX = 0;
+int dirY = 0;
+int rX=0;
+int rY = 0;
+
 void engineTick(int* x)
 {
     bool quit = false;
     int64_t lastCounter = getUSec(false);
-
 
     while(!quit)
     {
@@ -772,26 +840,98 @@ void engineTick(int* x)
         // if framerate appears to drop below about 6, assume we're at a breakpoint and simulate 20fps.
         if (deltaTime > 0.15f)
             deltaTime = 0.05f;
-
+        float speed = 15 * deltaTime;
         SDL_Event e;
         if(SDL_PollEvent(&e) > 0)
         {
             switch(e.type)
             {
+
                 case SDL_KEYDOWN:
                     switch(e.key.keysym.sym)
                     {
                         case SDLK_s:
-                            viewTransform.setZ(viewTransform.getZ() + 0.5);
+                            dirY = -1;
+                            pCameraController->onMove(float2(0, dirY));
+                            //viewTransform.setZ(viewTransform.getZ() + (speed * deltaTime));
                             break;
                         case SDLK_w:
-                            viewTransform.setZ(viewTransform.getZ() - 0.5);
+                            dirY = 1;
+                            pCameraController->onMove(float2(0, dirY));
+                            //viewTransform.setZ(viewTransform.getZ() - (speed * deltaTime));
                             break;
                         case SDLK_a:
-                            viewTransform.setX(viewTransform.getX() + 0.5);
+                            dirX = -1;
+                            pCameraController->onMove(float2(dirX, 0));
+                            //viewTransform.setX(viewTransform.getX() + (speed * deltaTime));
                             break;
                         case SDLK_d:
-                            viewTransform.setX(viewTransform.getX() - 0.5);
+                            dirX = 1;
+                            pCameraController->onMove(float2(dirX, 0));
+                            //viewTransform.setX(viewTransform.getX() - (speed * deltaTime));
+                            break;
+                        case SDLK_q:
+                            rX = -2;
+                            pCameraController->onRotate(float2(rX, 0));
+                            break;
+                        case SDLK_e:
+                            rX = 2;
+                            pCameraController->onRotate(float2(rX, 0));
+                            break;
+                        case SDLK_z:
+                            rY = -2;
+                            pCameraController->onRotate(float2(0, rY));
+                            break;
+                        case SDLK_x:
+                            rY = 2;
+                            pCameraController->onRotate(float2(0, rY));
+                            break;
+                    }
+                    break;
+                case SDL_KEYUP:
+                    switch(e.key.keysym.sym)
+                    {
+                        case SDLK_s:
+                            if(dirY < 0)
+                                pCameraController->onMove(float2(0, 0));
+                            //viewTransform.setZ(viewTransform.getZ() + (speed * deltaTime));
+                            break;
+                        case SDLK_w:
+                            if(dirY > 0) {
+                                pCameraController->onMove(float2(0, 0));
+                                //dirY = 0;
+                            }
+                            //viewTransform.setZ(viewTransform.getZ() - (speed * deltaTime));
+                            break;
+                        case SDLK_a:
+                            if(dirX < 0) {
+                                pCameraController->onMove(float2(0, 0));
+                               // dirX = 0;
+                            }
+                            //viewTransform.setX(viewTransform.getX() + (speed * deltaTime));
+                            break;
+                        case SDLK_d:
+                            if(dirX > 0) {
+                                pCameraController->onMove(float2(0, 0));
+                                //dirX = 0;
+                            }
+                            //viewTransform.setX(viewTransform.getX() - (speed * deltaTime));
+                            break;
+                        case SDLK_q:
+                            if(rX < 0)
+                                pCameraController->onRotate(float2(0, 0));
+                            break;
+                        case SDLK_e:
+                            if(rX > 0)
+                                pCameraController->onRotate(float2(0, 0));
+                            break;
+                        case SDLK_z:
+                            if(rY < 0)
+                                pCameraController->onRotate(float2(0, 0));
+                            break;
+                        case SDLK_x:
+                            if(rY > 0)
+                                pCameraController->onRotate(float2(0, 0));
                             break;
                     }
                     break;
@@ -822,17 +962,6 @@ void engineTick(int* x)
     exitFileSystem();
 
     exitMemAlloc();
-}
-
-void main_func(fjs::Manager* manager)
-{
-    int count = 1;
-    fjs::Counter counter(manager);
-
-    fjs::JobInfo test_job(&counter, engineTick, &count);
-
-    manager->ScheduleJob(fjs::JobPriority::Normal, test_job);
-    manager->WaitForCounter(&counter);
 }
 
 int main(int argc, char** argv)
@@ -903,21 +1032,9 @@ int main(int argc, char** argv)
 
     LOGF(LogLevel::eINFO, "Application Init+Load+Reload %fms", getTimerMSec(&t, false) / 1000.0f);
 
-    managerOptions.NumFibers = managerOptions.NumThreads * 10;
-    managerOptions.ThreadAffinity = true;
+    int* x = nullptr;
 
-    managerOptions.HighPriorityQueueSize = 128;
-    managerOptions.NormalPriorityQueueSize = 256;
-    managerOptions.LowPriorityQueueSize = 256;
-
-    managerOptions.ShutdownAfterMainCallback = true;
-
-// Manager
-    fjs::Manager manager(managerOptions);
-
-    gManager = &manager;
-
-    manager.Run(main_func);
+    engineTick(x);
 
     return 0;
 }
