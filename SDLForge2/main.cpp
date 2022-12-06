@@ -35,6 +35,9 @@
 
 #include "Utilities/Interfaces/IMemory.h"
 
+/*
+ * Define internal rendering functions that we need
+ */
 DECLARE_RENDERER_FUNCTION(void, addBuffer, Renderer* pRenderer, const BufferDesc* pDesc, Buffer** pp_buffer)
 DECLARE_RENDERER_FUNCTION(void, removeBuffer, Renderer* pRenderer, Buffer* pBuffer)
 DECLARE_RENDERER_FUNCTION(void, mapBuffer, Renderer* pRenderer, Buffer* pBuffer, ReadRange* pRange)
@@ -49,6 +52,9 @@ DECLARE_RENDERER_FUNCTION(void, addTexture, Renderer* pRenderer, const TextureDe
 DECLARE_RENDERER_FUNCTION(void, removeTexture, Renderer* pRenderer, Texture* pTexture)
 DECLARE_RENDERER_FUNCTION(void, addVirtualTexture, Cmd* pCmd, const TextureDesc* pDesc, Texture** ppTexture, void* pImageData)
 
+/*
+ * Define the subresourcedesc that is for some reason hidden
+ */
 struct SubresourceDataDesc
 {
     uint64_t mSrcOffset;
@@ -110,6 +116,10 @@ Buffer* pCameraUniformBuffers[gImageCount] = { NULL };
 Buffer* pInstanceDataBuffers[gImageCount] = { NULL };
 
 Texture* pTexture;
+Texture* pTexture2;
+
+Texture* pTextures[10];
+
 Sampler*       pLinearClampSampler = NULL;
 
 Pipeline* pTrianglePipeline = NULL;
@@ -120,18 +130,17 @@ DescriptorSet* pDescriptorSetUniforms = { NULL };
 
 ICameraController* pCameraController = NULL;
 
-struct Mesh
-{
-    Buffer* pVertexBuffer;
-    Buffer* pIndexBuffer;
-};
-
+/*
+ * Buffer for instance data
+ */
 struct InstanceData
 {
-    Matrix4 model = Matrix4::identity();
+    Matrix4 model;
+    uint32_t padding[3];
+    uint32_t index;
 };
 
-InstanceData instanceData[100];
+InstanceData instanceData[3];
 
 //Structure for our Vertices
 struct Vertex
@@ -141,10 +150,14 @@ struct Vertex
     float2 uv;
 };
 
+//Dynamic Array of Vertices and Indices
 Vertex* vertices = NULL;
 
 uint32_t* indices = NULL;
 
+/*
+ * Struct for our Uniform Data
+ */
 struct CameraUniforms
 {
     Matrix4 projview;
@@ -152,15 +165,13 @@ struct CameraUniforms
 
 CameraUniforms cameraUniforms;
 
-// Setup Job Manager
-fjs::ManagerOptions managerOptions;
-
-fjs::Manager* gManager;
-
+//Global View variable
 Matrix4 view = Matrix4::identity();
 
+//Global view transform
 Vector3 viewTransform = Vector3(0, -2, 10);
 
+//This gives us the ability to change which renderer we are using
 extern RendererApi gSelectedRendererApi;
 float delta;
 
@@ -195,8 +206,6 @@ static void LoadModel(char* file)
             vertex.color = {1.0f, 1.0f, 1.0f, 1.0f};
 
             arrpush(vertices, vertex);
-            if(!indices)
-                arrpush(indices, 0);
             arrpush(indices, arrlenu(indices));
         }
     }
@@ -266,8 +275,6 @@ bool Init()
                                 ADDRESS_MODE_CLAMP_TO_EDGE };
     addSampler(pRenderer, &samplerDesc, &pLinearClampSampler);
 
-    //Size of our vertex buffer
-    uint64_t size = sizeof(Vertex) * 3;
 
     BufferDesc cameraUBDesc = {};
     cameraUBDesc.mDescriptors = DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -287,11 +294,11 @@ bool Init()
     BufferDesc instanceDesc = {};
     instanceDesc.mDescriptors = DESCRIPTOR_TYPE_BUFFER;
     instanceDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
-    //instanceDesc.mDesc.mFlags = BUFFER_CREATION_FLAG_PERSISTENT_MAP_BIT;
+    instanceDesc.mFlags = BUFFER_CREATION_FLAG_NONE;
     instanceDesc.mFirstElement = 0;
-    instanceDesc.mElementCount = 100;
+    instanceDesc.mElementCount = 3;
     instanceDesc.mStructStride = sizeof(InstanceData);
-    instanceDesc.mSize = 100 * instanceDesc.mStructStride;
+    instanceDesc.mSize = 3 * instanceDesc.mStructStride;
     for (uint32_t i = 0; i < gImageCount; ++i)
     {
         addBuffer(pRenderer, &instanceDesc, &pInstanceDataBuffers[i]);
@@ -371,43 +378,42 @@ bool Init()
 
     removeBuffer(pRenderer, pStageBuffer);
 
-    LOGF(LogLevel::eDEBUG, "Testing");
+
+    /*
+     * Show how to add a texture using stb image...
+     * First create a texture with the size of the image
+     * then create a staging buffer of the same size
+     * then blit the two resources together
+     * and submit the command buffer
+     */
 
     //TODO TEXTURELOADER
     {
         int texWidth, texHeight, texChannels;
-
-        unsigned char* pixels = stbi_load("test.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-
+        unsigned char* pixels = stbi_load("test2.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         if (!pixels) {
             LOGF(LogLevel::eERROR, "Failed to load texture file!");
             //std::cout << "Failed to load texture file " << file << std::endl;
             return false;
         }
-
         void* pixel_ptr = pixels;
-
         int imageSize = texWidth * texHeight * 4;
-
         stageDesc.mDescriptors = DESCRIPTOR_TYPE_UNDEFINED;
         stageDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
         stageDesc.mSize = imageSize;
         addBuffer(pRenderer, &stageDesc, &pStageBuffer);
-
         readRange.mOffset = 0;
         readRange.mSize = imageSize;
-
         mapBuffer(pRenderer, pStageBuffer, &readRange);
         memcpy(pStageBuffer->pCpuMappedAddress, pixel_ptr, imageSize);
         unmapBuffer(pRenderer, pStageBuffer);
-
         TextureDesc texDesc = {};
         texDesc.mArraySize = 1;
         texDesc.mDepth = 1;
         texDesc.mFormat = TinyImageFormat_R8G8B8A8_UNORM;
         texDesc.mMipLevels = 1;
         texDesc.mSampleCount = SAMPLE_COUNT_1;
-        texDesc.mStartState = RESOURCE_STATE_COPY_DEST;
+        //texDesc.mStartState = RESOURCE_STATE_COPY_DEST;
         texDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
         texDesc.mWidth = texWidth;
         texDesc.mHeight = texHeight;
@@ -432,7 +438,6 @@ if(gSelectedRendererApi == RENDERER_API_VULKAN) {
             barrier = {pTexture, RESOURCE_STATE_COPY_DEST, RESOURCE_STATE_SHADER_RESOURCE};
             cmdResourceBarrier(pTransferCmd, 0, NULL, 1, &barrier, 0, NULL);
         }
-
         endCmd(pTransferCmd);
         submitDesc.mCmdCount = 1;
         submitDesc.mSignalSemaphoreCount = 0;
@@ -441,10 +446,74 @@ if(gSelectedRendererApi == RENDERER_API_VULKAN) {
         submitDesc.pSignalFence = pTransferFence;
         queueSubmit(pTransferQueue, &submitDesc);
         waitForFences(pRenderer, 1, &pTransferFence);
-
         stbi_image_free(pixel_ptr);
         removeBuffer(pRenderer, pStageBuffer);
     }
+
+    //TODO TEXTURELOADER
+    {
+        int texWidth, texHeight, texChannels;
+        unsigned char* pixels = stbi_load("test.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        if (!pixels) {
+            LOGF(LogLevel::eERROR, "Failed to load texture file!");
+            //std::cout << "Failed to load texture file " << file << std::endl;
+            return false;
+        }
+        void* pixel_ptr = pixels;
+        int imageSize = texWidth * texHeight * 4;
+        stageDesc.mDescriptors = DESCRIPTOR_TYPE_UNDEFINED;
+        stageDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+        stageDesc.mSize = imageSize;
+        addBuffer(pRenderer, &stageDesc, &pStageBuffer);
+        readRange.mOffset = 0;
+        readRange.mSize = imageSize;
+        mapBuffer(pRenderer, pStageBuffer, &readRange);
+        memcpy(pStageBuffer->pCpuMappedAddress, pixel_ptr, imageSize);
+        unmapBuffer(pRenderer, pStageBuffer);
+        TextureDesc texDesc = {};
+        texDesc.mArraySize = 1;
+        texDesc.mDepth = 1;
+        texDesc.mFormat = TinyImageFormat_R8G8B8A8_UNORM;
+        texDesc.mMipLevels = 1;
+        texDesc.mSampleCount = SAMPLE_COUNT_1;
+        //texDesc.mStartState = RESOURCE_STATE_COPY_DEST;
+        texDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
+        texDesc.mWidth = texWidth;
+        texDesc.mHeight = texHeight;
+        texDesc.mFlags = TEXTURE_CREATION_FLAG_SRGB;
+        addTexture(pRenderer, &texDesc, &pTexture2);
+
+        resetCmdPool(pRenderer, pTransferCmdPool);
+        beginCmd(pTransferCmd);
+        SubresourceDataDesc subDesc = {};
+        subDesc.mArrayLayer = 0;
+        subDesc.mSrcOffset = 0;
+        subDesc.mMipLevel = 0;
+        subDesc.mRowPitch = 1;
+        subDesc.mSlicePitch = 0;
+        TextureBarrier barrier;
+        if(gSelectedRendererApi == RENDERER_API_VULKAN) {
+            barrier = {pTexture2, RESOURCE_STATE_UNDEFINED, RESOURCE_STATE_COPY_DEST};
+            cmdResourceBarrier(pTransferCmd, 0, NULL, 1, &barrier, 0, NULL);
+        }
+        cmdUpdateSubresource(pTransferCmd, pTexture2, pStageBuffer, &subDesc);
+        if(gSelectedRendererApi == RENDERER_API_VULKAN) {
+            barrier = {pTexture2, RESOURCE_STATE_COPY_DEST, RESOURCE_STATE_SHADER_RESOURCE};
+            cmdResourceBarrier(pTransferCmd, 0, NULL, 1, &barrier, 0, NULL);
+        }
+        endCmd(pTransferCmd);
+        submitDesc.mCmdCount = 1;
+        submitDesc.mSignalSemaphoreCount = 0;
+        submitDesc.mWaitSemaphoreCount = 0;
+        submitDesc.ppCmds = &pTransferCmd;
+        submitDesc.pSignalFence = pTransferFence;
+        queueSubmit(pTransferQueue, &submitDesc);
+        waitForFences(pRenderer, 1, &pTransferFence);
+        stbi_image_free(pixel_ptr);
+        removeBuffer(pRenderer, pStageBuffer);
+    }
+
+    
 
     CameraMotionParameters cmp{60.0f, 200.0f, 200.0f};
     vec3                   camPos{0.0f, 0.0f, -10.0f};
@@ -454,9 +523,15 @@ if(gSelectedRendererApi == RENDERER_API_VULKAN) {
 
     pCameraController->setMotionParameters(cmp);
 
+    pTextures[0] = pTexture;
+    pTextures[1] = pTexture2;
 
     //Set the frame index to 0
     gFrameIndex = 0;
+
+    instanceData[0].model = Matrix4::identity();
+    instanceData[1].model = Matrix4::identity();
+    instanceData[2].model = Matrix4::identity();
 
     return true;
 }
@@ -527,7 +602,8 @@ bool Load()
 
     DescriptorData param[1] = {};
     param[0].pName = "Tex0";
-    param[0].ppTextures = &pTexture;
+    param[0].ppTextures = pTextures;
+    param[0].mCount = 2;
     updateDescriptorSet(pRenderer, 0, pDescriptorSetTexture, 1, param);
 
     for (uint32_t i = 0; i < gImageCount; ++i)
@@ -635,14 +711,17 @@ void Update(float delta)
     model.setTranslation(Vector3(2.0, 0.0, 0.0));
     model *= Matrix4::rotationZ((15.0f*3.14)/180.0f*delta);
     instanceData[0].model = model;
+    instanceData[0].index = 0;
     model = instanceData[1].model;
     model.setTranslation(Vector3(-2.0, 0.0, 0.0));
     model *= Matrix4::rotationY((15.0f*3.14)/180.0f*delta);
     instanceData[1].model = model;
+    instanceData[1].index = 0;
     model = Matrix4::identity();
     model = Matrix4::scale(Vector3(6, 0.5, 10.0));
     model.setTranslation(Vector3(0.0, -4.0, 0.0));
     instanceData[2].model = model;
+    instanceData[2].index = 1;
 
     //view = Matrix4::rotationX(-30.0*3.14/180);
     //view.setTranslation(viewTransform);
@@ -763,6 +842,7 @@ void Exit()
     exitCameraController(pCameraController);
 
     removeTexture(pRenderer, pTexture);
+    removeTexture(pRenderer, pTexture2);
 
     for (uint32_t i = 0; i < gImageCount; ++i)
     {
@@ -825,6 +905,7 @@ int dirX = 0;
 int dirY = 0;
 int rX=0;
 int rY = 0;
+
 
 void engineTick(int* x)
 {
@@ -1018,7 +1099,7 @@ int main(int argc, char** argv)
     Timer t;
     initTimer(&t);
 
-    gSelectedRendererApi = RENDERER_API_D3D12;
+    gSelectedRendererApi = RENDERER_API_VULKAN;
 
     if(!Init())
     {

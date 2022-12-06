@@ -127,7 +127,9 @@ bool Init()
         return false;
 
 
-    //Only need one queue for this example...
+/*
+ * Setup queues for transfer and presentation!
+ */
     QueueDesc queueDesc = {};
     queueDesc.mType = QUEUE_TYPE_GRAPHICS;
     queueDesc.mFlag = QUEUE_FLAG_INIT_MICROPROFILE;
@@ -137,6 +139,9 @@ bool Init()
     queueDesc.mFlag = QUEUE_FLAG_INIT_MICROPROFILE;
     addQueue(pRenderer, &queueDesc, &pTransferQueue);
 
+    /*
+     * Seperate CmdPool and Cmd for transfers
+     */
     CmdPoolDesc transferPoolDesk = {};
     transferPoolDesk.pQueue = pTransferQueue;
     addCmdPool(pRenderer, &transferPoolDesk, &pTransferCmdPool);
@@ -159,11 +164,12 @@ bool Init()
     }
     addSemaphore(pRenderer, &pImageAcquiredSemaphore);
 
-   // initResourceLoaderInterface(pRenderer);
+
 
     //Size of our vertex buffer
     uint64_t size = sizeof(Vertex) * 3;
 
+    //Create the Staging Buffer
     BufferDesc stageDesc = {};
     stageDesc.mDescriptors = DESCRIPTOR_TYPE_UNDEFINED;
     stageDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
@@ -181,6 +187,9 @@ bool Init()
 
     addBuffer(pRenderer, &vertDesc, &pTriangleVertexBuffer);
 
+    /*
+     * Copy Over data from one buffer to the other
+     */
     ReadRange readRange = { };
     readRange.mOffset = 0;
     readRange.mSize = sizeof(vertices);

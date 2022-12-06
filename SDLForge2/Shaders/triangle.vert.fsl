@@ -1,13 +1,15 @@
 
-RES(Tex2D(float4),  Tex0,  UPDATE_FREQ_NONE, t1, binding = 1);
-RES(SamplerState,  uSampler0, UPDATE_FREQ_NONE, s0, binding = 2);
+RES(Tex2D(float4),  Tex0[10],  UPDATE_FREQ_NONE, t1, binding = 2);
+RES(SamplerState,  uSampler0, UPDATE_FREQ_NONE, s0, binding = 3);
 
 STRUCT(InstanceData)
 {
 	DATA(float4x4, model, None);
+	DATA(uint, padding[3], None);
+	DATA(uint, texIndex, None);
 };
 
-RES(Buffer(InstanceData), instanceBuffer, UPDATE_FREQ_PER_FRAME, t0, binding = 3);
+RES(Buffer(InstanceData), instanceBuffer, UPDATE_FREQ_PER_FRAME, t0, binding = 1);
 
 CBUFFER(cameraUniform, UPDATE_FREQ_PER_FRAME, b0, binding = 0)
 {
@@ -26,6 +28,7 @@ STRUCT(VSOutput)
 	DATA(float4, Position, SV_Position);
 	DATA(float4, Color,    COLOR);
 	DATA(float2, UV, TEXCOORD0);
+	DATA(FLAT(uint), texIndex, TEXCOORD1);
 };
 
 VSOutput VS_MAIN( VSInput In, SV_InstanceID(uint) instanceId )
@@ -36,5 +39,6 @@ VSOutput VS_MAIN( VSInput In, SV_InstanceID(uint) instanceId )
     Out.Position = mul(Get(projview), pos);
     Out.Color = In.Color;
     Out.UV = In.UV;
+    Out.texIndex = Get(instanceBuffer)[instanceId].texIndex;
     RETURN(Out);
 }

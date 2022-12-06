@@ -62,10 +62,6 @@ if (${WINDOWS} MATCHES ON)
 
     add_custom_command(TARGET ${PROJECT_NAME}
             PRE_BUILD
-            COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/The-Forge/Common_3/Tools/ForgeShadingLanguage/fsl.py -d Shaders -b CompiledShaders ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/ShaderList.fsl --compile -l DIRECT3D11)
-
-    add_custom_command(TARGET ${PROJECT_NAME}
-            PRE_BUILD
             COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/The-Forge/Common_3/Tools/ForgeShadingLanguage/fsl.py -d Shaders -b CompiledShaders ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/ShaderList.fsl --compile -l DIRECT3D12)
 
     add_custom_command(TARGET ${PROJECT_NAME}
@@ -103,3 +99,9 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/test.jpg
         ${CMAKE_CURRENT_BINARY_DIR}/test.jpg)
+
+add_custom_command(
+        TARGET ${PROJECT_NAME} PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/test2.jpg
+        ${CMAKE_CURRENT_BINARY_DIR}/test2.jpg)
