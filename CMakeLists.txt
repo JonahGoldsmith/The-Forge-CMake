@@ -2,13 +2,23 @@ cmake_minimum_required(VERSION 3.15)
 
 project(The-Forge)
 
-# Do some OS checks, and setup accordingly.
-set(APPLE_PLATFORM OFF)
-set(LINUX OFF)
-set(WINDOWS OFF)
 
-# On macOS, we always set Metal support to on.
-set(METAL OFF)
+option( THE_FORGE_VULKAN                "Build Vulkan"                             ON)
+option( THE_FORGE_D3D12                 "Build D3D12"                              OFF)
+option( THE_FORGE_D3D11                 "Build D3D11"                              OFF)
+option( THE_FORGE_METAL                 "Build Metal"                              OFF)
+option( THE_FORGE_BUILD_EXAMPLES        "Build examples"                           OFF)
+option( THE_FORGE_SCRIPTING_LUA         "Build Lua"                                OFF)
+option( THE_FORGE_INPUT_SYSTEM                "Build Input"                              OFF)
+set(THE_FORGE_EXTERNAL_CONFIG_FILE          "" CACHE STRING "Location of The-Forge config file"       )
+
+if(NOT THE_FORGE_DIR)
+	set(THE_FORGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/The-Forge" CACHE STRING "Location of bx.")
+elseif(NOT IS_ABSOLUTE "${THE_FORGE_DIR}")
+	get_filename_component(BX_DIR "${THE_FORGE_DIR}" REALPATH BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
+
 
 # Make our APIs into options
 option(DX12 "DirectX12 (Windows only)" OFF)
@@ -126,8 +136,11 @@ endif()
 
 message("\n")
 
-add_subdirectory(Common)
-add_subdirectory(Testing)
-add_subdirectory(Triangle)
-add_subdirectory(Quad)
-add_subdirectory(Cube)
+# add_subdirectory(Common)
+# add_subdirectory(Testing)
+# add_subdirectory(Triangle)
+# add_subdirectory(Quad)
+# add_subdirectory(Cube)
+
+
+include( ${CMAKE_CURRENT_SOURCE_DIR}/cmake/The-Forge.cmake )
